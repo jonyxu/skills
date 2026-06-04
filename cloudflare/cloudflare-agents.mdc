@@ -1,0 +1,347 @@
+---
+description: Cloudflare Agents SDK 完全指南。构建有状态的 AI Agent，具有持久化内存、实时 WebSocket 连接、定时任务和嵌入式 SQLite。涵盖 Agent 类、Think 框架、通信渠道、工具、调度、子代理等全部功能。在 Cloudflare Workers 上开发 Agent 应用时使用。
+globs: src/agents/**/*, **/wrangler.jsonc, **/wrangler.toml
+---
+# Cloudflare Agents SDK 完全指南
+
+Cloudflare Agents 让你在有状态、持久化 Agent 运行时上构建和托管 AI Agent。每个 Agent 会话具有持久化身份、本地 SQL 存储、实时连接、定时工作和可恢复执行。
+
+**核心特性：** Agent 类 + Think 框架 + 通信渠道（Chat/Voice/Email/Slack/Webhook）+ 工具（Sandbox/Browser/AI Search/MCP/Payments）+ 调度 + 子代理
+
+## 快速开始
+
+```bash
+npx create-cloudflare@latest --template cloudflare/agents-starter
+cd agents-starter && npm install
+npm run dev
+```
+
+启动器包含流式 AI 聊天、服务端/客户端工具、人工审批和定时任务。
+
+## 核心架构
+
+Agents on Cloudflare 由四部分组成：
+
+1. **通信渠道** — Chat、Voice、Email、Slack、Webhook
+2. **Agent Harness** — 控制规划、工具使用和响应流程（Think 框架或自定义）
+3. **Agents SDK Runtime** — Agent 类、状态、会话、路由、WebSocket、调度、Fibers、可观测性
+4. **工具** — 浏览器自动化、沙箱代码执行、AI Search、MCP、支付
+
+## Agent 类
+
+Agent 是扩展基础 `Agent` 的类：
+
+```typescript
+import { Agent, routeAgentRequest } from "agents";
+
+export class MyAgent extends Agent<Env, State> {
+  // Agent logic
+}
+
+export default {
+  async fetch(request: Request, env: Env) {
+    return (
+      (await routeAgentRequest(request, env)) ||
+      new Response("Not found", { status: 404 })
+    );
+  },
+} satisfies ExportedHandler<Env>;
+```
+
+每个 Agent 可以有数百万个实例。实例通过唯一标识符（用户 ID、邮箱、工单号等）寻址，全局唯一。
+
+### 生命周期
+
+| 方法 | 触发时机 |
+|------|----------|
+| `onStart(props?)` | 实例启动或从休眠唤醒 |
+| `onRequest(request)` | HTTP 请求到达实例 |
+| `onConnect(connection, ctx)` | WebSocket 连接建立 |
+| `onMessage(connection, message)` | 收到 WebSocket 消息 |
+| `onError(connection, error)` | WebSocket 错误 |
+| `onClose(connection, code, reason, wasClean)` | WebSocket 关闭 |
+| `onEmail(email)` | 邮件路由到实例 |
+| `onStateChanged(state, source)` | 状态变更 |
+
+### 核心属性
+
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| `this.env` | Env | 环境变量和绑定 |
+| `this.ctx` | ExecutionContext | 请求执行上下文 |
+| `this.state` | State | 当前持久化状态 |
+| `this.sql` | Function | 嵌入式 SQLite 查询 |
+
+### 状态管理
+
+状态具有持久化、跨客户端实时同步、双向更新、类型安全特性。
+
+```typescript
+type GameState = {
+  players: string[];
+  score: number;
+  status: "waiting" | "playing" | "finished";
+};
+
+export class GameAgent extends Agent<Env, GameState> {
+  initialState: GameState = {
+    players: [],
+    score: 0,
+    status: "waiting",
+  };
+
+  onStateChanged(state: GameState, source: Connection | "server") {
+    if (source !== "server" && state.players.length >= 2) {
+      this.setState({ ...state, status: "playing" });
+    }
+  }
+}
+```
+
+**State vs SQL：** 用 State 存 UI 状态和实时数据，用 SQL 存历史数据和大型集合。
+
+### SQL API
+
+```typescript
+// 创建表
+this.sql`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT)`;
+// 插入
+this.sql`INSERT INTO users (id, name) VALUES (${id}, ${name})`;
+// 查询
+const users = this.sql<User>`SELECT * FROM users WHERE id = ${id}`;
+```
+
+### 路由
+
+URL 模式：`https://your-worker.workers.dev/agents/:agent-name/:instance-name`
+
+```typescript
+import { routeAgentRequest } from "agents";
+
+export default {
+  async fetch(request: Request, env: Env) {
+    return (
+      routeAgentRequest(request, env) ||
+      new Response("Not found", { status: 404 })
+    );
+  },
+} satisfies ExportedHandler<Env>;
+```
+
+### 服务端 API 功能
+
+| 特性 | 方法 | 文档 |
+|------|------|------|
+| 状态 | `setState()`, `onStateChanged()`, `initialState` | Store and sync state |
+| 可调用方法 | `@callable()` 装饰器 | Callable methods |
+| 调度 | `schedule()`, `scheduleEvery()`, `getScheduleById()`, `listSchedules()` | Schedule tasks |
+| 持久化执行 | `runFiber()`, `startFiber()`, `stash()`等 | Durable execution |
+| 队列 | `queue()`, `dequeue()`, `dequeueAll()`, `getQueue()` | Queue tasks |
+| WebSocket | `onConnect()`, `onMessage()`, `onClose()`, `broadcast()` | WebSockets |
+| HTTP/SSE | `onRequest()` | HTTP and SSE |
+| Email | `onEmail()`, `replyToEmail()` | Email routing |
+| Workflows | `runWorkflow()`, `waitForApproval()` | Run Workflows |
+| MCP 客户端 | `addMcpServer()`, `removeMcpServer()`, `getMcpServers()` | MCP Client API |
+| AI 模型 | Workers AI, OpenAI, Anthropic 绑定 | Using AI models |
+| 子代理 | `subAgent()`, `abortSubAgent()`, `deleteSubAgent()` | Sub-agents |
+| Agent 工具 | `runAgentTool()`, `clearAgentToolRuns()`, `hasAgentToolRun()` | Agent tools |
+| Agent Skills | skills registry, bundled skill sources | Agent Skills |
+| 会话 | Session.create(), context blocks, compaction, search | Sessions |
+| 可观测性 | subscribe(), diagnostics channels, Tail Workers | Observability |
+
+### 客户端 SDK
+
+```typescript
+import { useAgent } from "agents/react";
+
+function App() {
+  const agent = useAgent<MyAgent, State>({
+    agent: "my-agent",
+    name: "user-123",
+  });
+  agent.stub.someMethod();
+  agent.setState({ count: 1 });
+}
+```
+
+React hooks：`useAgent()`, `useAgentChat()`, `useAgentToolEvents()`
+
+## Think 框架
+
+`@cloudflare/think` — 有状态的 AI 聊天 Agent 框架。扩展一个基类，提供 `getModel()`，Think 自动处理 Agent 循环、消息持久化、流式传输、客户端工具、流恢复和扩展。
+
+### 快速开始
+
+安装：
+```bash
+npm install @cloudflare/think @cloudflare/ai-chat agents ai @cloudflare/shell zod workers-ai-provider
+```
+
+**服务端：**
+```typescript
+import { Think } from "@cloudflare/think";
+import { createWorkersAI } from "workers-ai-provider";
+import { routeAgentRequest } from "agents";
+
+export class MyAgent extends Think<Env> {
+  getModel() {
+    return createWorkersAI({ binding: this.env.AI })("@cf/moonshotai/kimi-k2.6");
+  }
+}
+
+export default {
+  async fetch(request: Request, env: Env) {
+    return (
+      (await routeAgentRequest(request, env)) ||
+      new Response("Not found", { status: 404 })
+    );
+  },
+} satisfies ExportedHandler<Env>;
+```
+
+**客户端（React）：**
+```typescript
+import { useAgent } from "agents/react";
+import { useAgentChat } from "@cloudflare/ai-chat/react";
+
+function Chat() {
+  const agent = useAgent({ agent: "MyAgent" });
+  const { messages, sendMessage, status } = useAgentChat({ agent });
+  // ...
+}
+```
+
+**wrangler.jsonc 配置：**
+```json
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "compatibility_date": "2026-06-04",
+  "compatibility_flags": ["nodejs_compat"],
+  "ai": { "binding": "AI" },
+  "durable_objects": {
+    "bindings": [{ "class_name": "MyAgent", "name": "MyAgent" }]
+  },
+  "migrations": [{ "new_sqlite_classes": ["MyAgent"], "tag": "v1" }]
+}
+```
+
+### Think vs AIChatAgent
+
+| 关注点 | AIChatAgent | Think |
+|--------|-------------|-------|
+| 最小子类 | ~15 行 | 3 行（仅 getModel()） |
+| 存储 | 扁平 SQL 表 | 会话：树结构消息、上下文块、压缩、FTS5 |
+| 上下文管理 | 手动 | 上下文块 + LLM 可写持久化内存 |
+| 子代理 RPC | 不支持 | `chat()` + StreamCallback |
+| 压缩 | 删除最旧的 | 通过覆层非破坏性摘要 |
+| 搜索 | 不适用 | FTS5 全文搜索 |
+
+### Think API 选择
+
+| 用例 | API |
+|------|-----|
+| 浏览器用户聊天 | `useAgentChat` over WebSocket |
+| 服务端等待模型响应 | `saveMessages()` |
+| 服务端快速持久化提交 | `submitMessages()` |
+| 定期触发 | `getScheduledTasks()` |
+| 父子流式 RPC | `subAgent(...).chat()` |
+| 持久化作业副作用 | `startFiber()` |
+
+## 调度
+
+支持四种模式：
+
+| 模式 | 语法 | 场景 |
+|------|------|------|
+| **延迟** | `this.schedule(60, ...)` | 60 秒后执行 |
+| **定时** | `this.schedule(new Date(...), ...)` | 指定时间 |
+| **Cron** | `this.schedule("0 8 * * *", ...)` | 定时重复 |
+| **间隔** | `this.scheduleEvery(30, ...)` | 每 30 秒 |
+
+```typescript
+// Cron 常用模式
+await this.schedule("*/5 * * * *", "poll", {});  // 每 5 分钟
+await this.schedule("0 * * * *", "hourlyCheck", {}); // 每小时
+await this.schedule("0 8 * * 1-5", "weekdayDigest", {}); // 工作日 8am
+```
+
+## 工具
+
+### Sandbox（代码执行沙箱）
+
+```typescript
+import { getSandbox } from "@cloudflare/sandbox";
+export { Sandbox } from "@cloudflare/sandbox";
+
+export class CodeAgent extends Agent {
+  @callable()
+  async runPython(code: string) {
+    const sandbox = getSandbox(this.env.Sandbox, this.name);
+    await sandbox.writeFile("/workspace/script.py", code);
+    const result = await sandbox.exec("python3 /workspace/script.py");
+    return { success: result.success, stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode };
+  }
+}
+```
+
+### Browser（浏览器自动化）
+
+```typescript
+import { createBrowserTools } from "agents/browser/ai";
+import { streamText, convertToModelMessages, stepCountIs } from "ai";
+
+const browserTools = createBrowserTools({
+  browser: this.env.BROWSER,
+  loader: this.env.LOADER,
+});
+
+const result = streamText({
+  model: workersai("@cf/zai-org/glm-4.7-flash"),
+  system: "You can inspect web pages with browser tools.",
+  messages: await convertToModelMessages(this.messages),
+  tools: browserTools,
+  stopWhen: stepCountIs(10),
+});
+```
+
+浏览器工具提供：`browser_search`（查询 CDP 规范）和 `browser_execute`（运行 CDP 命令）。
+
+## 配置要点（wrangler.jsonc）
+
+```json
+{
+  "compatibility_flags": ["nodejs_compat"],
+  "ai": { "binding": "AI" },
+  "browser": { "binding": "BROWSER" },
+  "worker_loaders": [{ "binding": "LOADER" }],
+  "containers": [{
+    "class_name": "Sandbox",
+    "image": "./Dockerfile",
+    "instance_type": "lite",
+    "max_instances": 1
+  }],
+  "durable_objects": {
+    "bindings": [
+      { "class_name": "MyAgent", "name": "MyAgent" },
+      { "class_name": "Sandbox", "name": "Sandbox" }
+    ]
+  },
+  "migrations": [
+    { "new_sqlite_classes": ["MyAgent", "Sandbox"], "tag": "v1" }
+  ]
+}
+```
+
+## 参考链接
+
+- [Agents 官方文档](https://developers.cloudflare.com/agents/)
+- [Agents API 参考](https://developers.cloudflare.com/agents/runtime/agents-api/)
+- [Think 框架](https://developers.cloudflare.com/agents/harnesses/think/)
+- [状态管理](https://developers.cloudflare.com/agents/runtime/lifecycle/state/)
+- [调度](https://developers.cloudflare.com/agents/runtime/execution/schedule-tasks/)
+- [Sandbox](https://developers.cloudflare.com/agents/tools/sandbox/)
+- [Browser](https://developers.cloudflare.com/agents/tools/browser/)
+- [AI 模型](https://developers.cloudflare.com/agents/runtime/operations/using-ai-models/)
+- [Workers AI](https://developers.cloudflare.com/workers-ai/)
+- [示例 Agent](https://developers.cloudflare.com/agents/examples/chat-agent/)
+- [GitHub](https://github.com/cloudflare/agents)
