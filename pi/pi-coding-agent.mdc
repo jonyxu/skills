@@ -1,0 +1,186 @@
+---
+description: Pi Coding Agent 是一个极简终端编码工具，基于 TypeScript 扩展系统。涵盖安装、认证、配置、会话管理、上下文文件、技能、扩展、主题等全部功能的完整指南。在需要配置或使用 Pi 时使用。
+globs: .pi/**/*, ~/.pi/**/*, **/pi/**/*
+---
+# Pi Coding Agent 完全指南
+
+Pi 是一个极简终端编码 harness。核心保持小巧，通过 TypeScript 扩展、skills、prompt 模板、主题和 pi 包进行扩展。
+
+## 快速安装
+
+```bash
+npm install -g --ignore-scripts @earendil-works/pi-coding-agent
+```
+
+Linux/macOS 也可使用安装脚本：
+
+```bash
+curl -fsSL https://pi.dev/install.sh | sh
+```
+
+## 认证
+
+### 订阅登录
+在 Pi 中运行 `/login`，然后选择 provider。内置订阅登录包括 Claude Pro/Max、ChatGPT Plus/Pro (Codex) 和 GitHub Copilot。
+
+### API Key
+设置环境变量后启动 Pi：
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+pi
+```
+
+## 启动与基本使用
+
+```bash
+cd /path/to/project
+pi                          # 交互模式
+pi -p "Summarize this"      # 打印模式（一次性）
+pi -c                       # 继续最近的会话
+pi -r                       # 浏览并选择会话
+pi --name "my task"         # 设置会话名
+pi @README.md "Analyze"     # 引用文件
+pi --model sonnet:high      # 指定模型和思考级别
+pi --tools read,grep,find,ls -p "Review code"  # 只读模式
+```
+
+## 交互模式接口
+
+- **启动头部** - 快捷键、加载的上下文文件、prompt 模板、skills、扩展
+- **消息区域** - 用户消息、助手响应、工具调用
+- **编辑器** - 输入区域；边框颜色表示当前思考级别
+- **底部栏** - 工作目录、会话名、token/缓存用量、消耗、上下文使用、当前模型
+
+### 编辑器特性
+
+| 特性 | 操作 |
+|------|------|
+| 文件引用 | 输入 `@` 模糊搜索项目文件 |
+| 路径补全 | Tab 键 |
+| 多行输入 | Shift+Enter |
+| 图片粘贴 | Ctrl+V, 或拖入终端 |
+| Shell 命令 | `!command` (输出发给模型) |
+| 隐藏 Shell | `!!command` (不发送输出) |
+| 外部编辑器 | Ctrl+G 打开 `$VISUAL` 或 `$EDITOR` |
+
+## 斜杠命令
+
+| 命令 | 说明 |
+|------|------|
+| `/login`, `/logout` | 管理认证 |
+| `/model` | 切换模型 |
+| `/settings` | 思考级别、主题等 |
+| `/resume` | 选择之前的会话 |
+| `/new` | 开始新会话 |
+| `/name <name>` | 设置会话名 |
+| `/session` | 显示信息 |
+| `/tree` | 导航会话树 |
+| `/fork` | 从之前消息分叉 |
+| `/clone` | 复制当前分支 |
+| `/compact [prompt]` | 手动压缩上下文 |
+| `/copy` | 复制最后助手消息 |
+| `/export [file]` | 导出为 HTML |
+| `/share` | 上传为 Gist |
+| `/reload` | 重载配置 |
+| `/hotkeys` | 所有快捷键 |
+| `/quit` | 退出 |
+| `/skill:name` | 加载并执行 skill (需 `enableSkillCommands: true`) |
+
+## 上下文文件
+
+Pi 启动时加载以下文件：
+- `~/.pi/agent/AGENTS.md` — 全局指令
+- 从 cwd 向上查找的 `AGENTS.md` 或 `CLAUDE.md`
+- 当前目录的 `AGENTS.md` 或 `CLAUDE.md`
+
+用于项目规范、命令、安全规则和偏好。修改后重启或运行 `/reload`。
+
+### 系统提示文件
+- `.pi/SYSTEM.md` — 项目级替换默认系统提示
+- `~/.pi/agent/SYSTEM.md` — 全局替换
+- `APPEND_SYSTEM.md` — 追加到默认提示（不替换）
+
+## 设置
+
+位置：`~/.pi/agent/settings.json` (全局) 和 `.pi/settings.json` (项目)
+
+### 常用设置
+
+```json
+{
+  "defaultProvider": "anthropic",
+  "defaultModel": "claude-sonnet-4-20250514",
+  "defaultThinkingLevel": "medium",
+  "theme": "dark",
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 16384,
+    "keepRecentTokens": 20000
+  },
+  "retry": {
+    "enabled": true,
+    "maxRetries": 3,
+    "baseDelayMs": 2000
+  },
+  "enabledModels": ["claude-*", "gpt-4o", "gemini-2*"],
+  "enableSkillCommands": true,
+  "warnings": {
+    "anthropicExtraUsage": true
+  },
+  "packages": ["pi-skills", "npm:@org/my-package"]
+}
+```
+
+### 技能加载设置
+
+```json
+{
+  "skills": [
+    "~/.claude/skills",
+    "~/.codex/skills"
+  ]
+}
+```
+
+## Sessions
+
+自动保存到 `~/.pi/agent/sessions/`，按工作目录组织。
+
+```bash
+pi -c                              # 继续最近会话
+pi -r                              # 浏览选择
+pi --session <path|id>             # 打开指定会话
+pi --fork <path|id>                # 分叉会话
+pi --name "my task"                # 设置名称
+pi --no-session                    # 临时模式
+```
+
+### CLI 参考
+
+```bash
+pi [options] [@files...] [messages...]
+```
+
+**Model 选项：** `--provider`, `--model`, `--api-key`, `--thinking`, `--models`, `--list-models`
+**Session 选项：** `-c`, `-r`, `--session`, `--fork`, `--session-dir`, `--no-session`, `--name`
+**Tool 选项：** `--tools`, `--exclude-tools`, `--no-builtin-tools`, `--no-tools`
+**Resource 选项：** `-e`, `--extension`, `--no-extensions`, `--skill`, `--no-skills`, `--prompt-template`, `--theme`, `--no-context-files`
+**其他：** `--system-prompt`, `--append-system-prompt`, `--verbose`, `--help`, `-v`
+
+### 消息队列
+
+在 agent 工作时可提交消息：
+- **Enter** — 排入 steering 消息（当前回合工具调用完成后发送）
+- **Alt+Enter** — 排入 follow-up 消息（所有工作完成后发送）
+- **Escape** — 中止并恢复消息到编辑器
+- **Alt+Up** — 取回排队的消息
+
+## 内置工具
+
+内置工具：`read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`
+
+Pi 有意不包含内置 MCP、子代理、权限弹窗、计划模式、待办或后台 bash。这些可以作为扩展或包来构建。
+
+## 设计原则
+
+核心保持小巧，将工作流特定行为推到扩展、skills、prompt 模板和包中。
