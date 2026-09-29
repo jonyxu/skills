@@ -77,6 +77,8 @@ Skills 集合仓库。每个子目录包含一个独立 skill。
 |-------|------|
 | [wxvideos](wxvideos/SKILL.md) | 微信视频号视频下载与内容分析工具链 |
 | [chinese-colors](chinese-colors/SKILL.md) | 中国传统色配色方案生成工具 |
+| [fetching-ai-news](fetching-ai-news/SKILL.md) | 五大英文 AI 信源抓取与中文编译 — TLDR / Rundown / Superhuman / TAAFT / Mindstream，含 TAAFT 的 playwright 通道 |
+| [dual-format-recap-video](dual-format-recap-video/SKILL.md) | 新闻周报解说视频 — 横竖双版同一时间轴、语音克隆(10.20.30.2)、SRT 字幕、清晰首帧海报 |
 ## 使用
 
 将所需 skill 目录链接到你的 agent 配置即可。详见各子目录的说明。
@@ -88,3 +90,4 @@ Skills 集合仓库。每个子目录包含一个独立 skill。
 | 原生 | — | 2 (pi, cloudflare) |
 | MiniMax | [MiniMax-AI/skills](https://github.com/MiniMax-AI/skills) | 17 |
 | Superpowers | [obra/superpowers](https://github.com/obra/superpowers) | 14 |
+| Custom | — | 4 (wxvideos, chinese-colors, fetching-ai-news, dual-format-recap-video) |
