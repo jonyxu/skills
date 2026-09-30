@@ -1,6 +1,6 @@
 ---
 name: dual-format-recap-video
-description: Use when turning an article, newsletter, or weekly news roundup into a narrated explainer video and BOTH a landscape 16:9 cut and a vertical 9:16 cut are wanted; also when re-voicing any HyperFrames video with the 10.20.30.2 voice-clone service (reference voice liuzw), when captions must be driven by the returned SRT files, or when the first frame of a video must read as a clear poster.
+description: Use when turning an article, newsletter, or news roundup of any cadence (daily, weekly, or a special edition) into a narrated explainer video and BOTH a landscape 16:9 cut and a vertical 9:16 cut are wanted; also when re-voicing any HyperFrames video with the 10.20.30.2 voice-clone service (reference voice liuzw), when captions must be driven by the returned SRT files, or when the first frame of a video must read as a clear poster.
 ---
 
 # Dual-Format Recap Video
@@ -21,8 +21,15 @@ the right shape for a one-shot delivery.
 ### 1. Scaffold and brief
 `npx hyperframes init "videos/<name>" --non-interactive --example=blank --skill=general-video`,
 then write `BRIEF.md` (message / aspect 1920x1080 / language zh / length /
-voice) as the first action. **Done when:** `npx hyperframes check` runs clean
-on the scaffold.
+voice / **cadence + content date range: derive the covered period from the
+task prompt AND what the sources actually cover — it may be 单日, 本周,
+双周, 月, or a 专题; never assume a fixed cadence**) as the first action.
+The derived cadence fixes the show label (e.g. 今日/每日 for one day,
+本周/周报 for a week, 专题 for an event); the intro title, kicker, narration
+opener, and outro keywords line all derive from it — they must never be
+copied from a previous episode. **Done when:** `npx hyperframes check` runs
+clean on the scaffold and the brief's cadence + date range match both the
+task prompt and the sources' actual coverage.
 
 ### 2. Collect the article's own images
 Ingest every screenshot with `npx hyperframes media-use resolve --type image
@@ -33,7 +40,9 @@ planned scene has an image whose `.media/index.md` entry exists.
 
 ### 3. Record narration with the clone service
 Author per-segment narration (one speaking beat per segment, targeted at the
-duration the brief needs), then run `scripts/clone-voice.py` (see
+duration the brief needs; the opener and closing lines use the brief's
+derived cadence label), then run
+`scripts/clone-voice.py` (see
 `references/voice-clone-service.md` for the service contract and its two hard
 pitfalls: flaky port windows, and Chinese text that must travel in a UTF-8
 file, never on the command line). **Done when:** every segment has a measured
@@ -87,6 +96,7 @@ frame 0 plus one mid-caption frame are visually confirmed.
 | Concern | Rule |
 |---|---|
 | Speed → duration | 0.9 ≈ ×1.2, 1.0 = ×1.0, 1.1 ≈ ×0.95 relative to measured 1.0 audio |
+| Cadence label | Derived from the task prompt + the content's actual date range (单日/本周/双周/专题…); label must match it, checked before render |
 | Caption band | Bottom band above the metabar; all scene content ends higher |
 | Image paths | `.media/images/...` (never `assets/images/...`) |
 | Audio track | 10; captions 5; visuals 1 |
@@ -107,3 +117,10 @@ frame 0 plus one mid-caption frame are visually confirmed.
   `data-layout-allow-occlusion`.
 - **Treating leaks as fact** — keep "泄露/据悉" wording in both narration and
   on-screen cards for unreleased items.
+- **Inheriting the previous episode's label** — the show label (intro title,
+  kicker, chips, narration opener, outro keywords line) must be re-derived
+  from the brief's cadence every episode; the cadence comes from the task
+  prompt + the content's actual date range, never a daily/weekly assumption.
+  Before rendering, grep `index.html`, `compositions/`, and the narration
+  SRTs for period words (今/昨/本/周/双周/月/专题…) and check each hit
+  against the brief's cadence.
