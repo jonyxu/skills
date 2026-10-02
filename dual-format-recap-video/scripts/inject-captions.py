@@ -3,7 +3,7 @@
 
 Usage:
   python inject-captions.py --project <hyperframes-root> \
-      [--voice-dir assets/voice-clone] [--track 5] [--units-h 36] [--units-v 20]
+      [--voice-dir assets/voice] [--track 5] [--units-h 36] [--units-v 20]
 
 Reads <voice-dir>/<id>.srt per narration segment, maps each segment's SRT
 window to absolute composition time via the matching <audio id="vo-<id>"
@@ -65,7 +65,7 @@ def parse_srt(path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--project", required=True)
-    ap.add_argument("--voice-dir", default="assets/voice-clone")
+    ap.add_argument("--voice-dir", default="assets/voice")
     ap.add_argument("--track", type=int, default=5)
     ap.add_argument("--units-h", type=float, default=36)
     ap.add_argument("--units-v", type=float, default=20)

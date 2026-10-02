@@ -1,6 +1,6 @@
 ---
 name: dual-format-recap-video
-description: Use when turning an article, newsletter, or news roundup of any cadence (daily, weekly, or a special edition) into a narrated explainer video and BOTH a landscape 16:9 cut and a vertical 9:16 cut are wanted; also when re-voicing any HyperFrames video with the 10.20.30.2 voice-clone service (reference voice liuzw), when captions must be driven by the returned SRT files, or when the first frame of a video must read as a clear poster.
+description: Use when turning an article, newsletter, or news roundup of any cadence (daily, weekly, or a special edition) into a narrated explainer video and BOTH a landscape 16:9 cut and a vertical 9:16 cut are wanted; also when re-voicing any HyperFrames video with edge-tts neural voices (default zh-CN-XiaoxiaoNeural, young female), when captions must be driven by the generated SRT files, or when the first frame of a video must read as a clear poster.
 ---
 
 # Dual-Format Recap Video
@@ -38,16 +38,16 @@ composition references **`.media/images/...`, not `assets/images/...`** —
 referencing `assets/` fails lint `missing_local_asset`. **Done when:** every
 planned scene has an image whose `.media/index.md` entry exists.
 
-### 3. Record narration with the clone service
+### 3. Generate narration with edge-tts
 Author per-segment narration (one speaking beat per segment, targeted at the
 duration the brief needs; the opener and closing lines use the brief's
-derived cadence label), then run
-`scripts/clone-voice.py` (see
-`references/voice-clone-service.md` for the service contract and its two hard
-pitfalls: flaky port windows, and Chinese text that must travel in a UTF-8
-file, never on the command line). **Done when:** every segment has a measured
-`dur` in `audio_clone_meta.json` (resume-safe), and the sum plus planned gaps
-lands inside the requested length window.
+derived cadence label), then run `scripts/tts-voice.py` (default voice
+`zh-CN-XiaoxiaoNeural` — young female; see `references/edge-tts.md` for the
+voice catalog, the measured rate mapping, and the network pitfall). Each
+segment yields an MP3 plus a sentence-level UTF-8 SRT with real timestamps
+from the service's sentence boundaries. **Done when:** every segment has a
+measured `dur` in `audio_tts_meta.json` (resume-safe), and the sum plus
+planned gaps lands inside the requested length window.
 
 ### 4. Lay out the timeline from measured durations
 Compute: segment starts (gap ~0.6s) → scene slots (gap ~1.5s) → root
@@ -95,12 +95,12 @@ frame 0 plus one mid-caption frame are visually confirmed.
 
 | Concern | Rule |
 |---|---|
-| Speed → duration | 0.9 ≈ ×1.2, 1.0 = ×1.0, 1.1 ≈ ×0.95 relative to measured 1.0 audio |
+| Rate → duration | +10% ≈ ×0.91, −10% ≈ ×1.11 vs +0% (measured); prefer trimming the script text over rate tweaks |
 | Cadence label | Derived from the task prompt + the content's actual date range (单日/本周/双周/专题…); label must match it, checked before render |
 | Caption band | Bottom band above the metabar; all scene content ends higher |
 | Image paths | `.media/images/...` (never `assets/images/...`) |
 | Audio track | 10; captions 5; visuals 1 |
-| Chinese POST bodies | Always `--data-binary @utf8-file` |
+| TTS text & SRT | Python API (UTF-8 in-process); SRT/meta files always written UTF-8 |
 
 ## Common mistakes
 
@@ -117,6 +117,9 @@ frame 0 plus one mid-caption frame are visually confirmed.
   `data-layout-allow-occlusion`.
 - **Treating leaks as fact** — keep "泄露/据悉" wording in both narration and
   on-screen cards for unreleased items.
+- **Assuming TTS works offline** — edge-tts calls Microsoft's endpoint on
+  every synthesis; smoke-test one line before a full batch. A failed
+  segment is reported FAILED after 3 attempts, never silent audio.
 - **Inheriting the previous episode's label** — the show label (intro title,
   kicker, chips, narration opener, outro keywords line) must be re-derived
   from the brief's cadence every episode; the cadence comes from the task
