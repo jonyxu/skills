@@ -77,7 +77,7 @@ Skills 集合仓库。每个子目录包含一个独立 skill。
 |-------|------|
 | [wxvideos](wxvideos/SKILL.md) | 微信视频号视频下载与内容分析工具链 |
 | [chinese-colors](chinese-colors/SKILL.md) | 中国传统色配色方案生成工具 |
-| [fetching-ai-news](fetching-ai-news/SKILL.md) | 六源英文 AI 资讯抓取与中文编译 — TLDR / Rundown / Superhuman / Mindstream + TechCrunch AI / Product Hunt（全 webfetch，无头可用） |
+| [fetching-ai-news](fetching-ai-news/SKILL.md) | 七源英文 AI 资讯抓取与中文编译 — TLDR / Rundown / Superhuman / Mindstream + TechCrunch AI / The Verge AI / Product Hunt（全 webfetch，无头可用） |
 | [dual-format-recap-video](dual-format-recap-video/SKILL.md) | 新闻解说视频(日更/周报/专题,周期按任务与信源推导) — 横竖双版同一时间轴、edge-tts 神经语音(默认年轻女声)、SRT 字幕、清晰首帧海报 |
 ## 使用
 
